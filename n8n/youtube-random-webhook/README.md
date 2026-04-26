@@ -1,11 +1,11 @@
 # n8n YouTube Random Webhook Workflow
 
 This workflow is fully built from n8n nodes. It picks one random video from a
-YouTube channel RSS feed every 6 hours and sends it to an IFTTT Webhooks applet.
+YouTube channel RSS feed once per day and sends it to an IFTTT Webhooks applet.
 The applet can then publish to Threads, Mastodon, Bluesky, Instagram, or any
 other service you connect in IFTTT.
 
-1. Schedule Trigger every 6 hours
+1. Schedule Trigger once per day
 2. HTTP Request to the YouTube RSS feed
 3. Code node to choose a random video
 4. HTTP Request to the publishing webhook
@@ -68,7 +68,7 @@ https://maker.ifttt.com/trigger/YOUR_EVENT_NAME/with/key/YOUR_IFTTT_WEBHOOK_KEY
 ## Notes
 
 - The workflow is inactive by default.
-- The schedule is every 6 hours.
+- The schedule is once per day.
 - The YouTube URL sent in `value2` uses the full `youtube.com/watch?v=...`
   format, which is more compatible with link preview systems than `youtu.be`.
 - If a destination platform does not render a thumbnail, the limitation is
