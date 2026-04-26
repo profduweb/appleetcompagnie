@@ -1,0 +1,135 @@
+{
+  "id": "youtube-random-to-webhook-daily",
+  "name": "YouTube aleatoire vers webhook une fois par jour",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "bb3b7b3c-4db8-4641-82f9-61a6b7bff7d2",
+      "name": "Une fois par jour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.youtube.com/feeds/videos.xml?channel_id=YOUR_YOUTUBE_CHANNEL_ID",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "0d340c2e-8c36-4780-834a-fbfb875f1692",
+      "name": "Lire le flux YouTube",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "function decodeXml(value) {\n  return value\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\");\n}\n\nfunction stripCdata(value) {\n  return value.replace(/^<!\\[CDATA\\[/, '').replace(/\\]\\]>$/, '');\n}\n\nfunction getTag(entry, tagName) {\n  const match = entry.match(new RegExp(`<${tagName}[^>]*>([\\\\s\\\\S]*?)</${tagName}>`));\n  return match ? decodeXml(stripCdata(match[1].trim())) : '';\n}\n\nfunction getAlternateLink(entry) {\n  const match = entry.match(/<link\\b[^>]*rel=[\"']alternate[\"'][^>]*href=[\"']([^\"']+)[\"'][^>]*\\/?>/);\n  return match ? decodeXml(match[1]) : '';\n}\n\nconst feed = $input.first().json.data;\nconst entries = [...feed.matchAll(/<entry>([\\s\\S]*?)<\\/entry>/g)]\n  .map((match) => match[1])\n  .map((entry) => {\n    const title = getTag(entry, 'title');\n    const videoId = getTag(entry, 'yt:videoId');\n    const link = videoId ? `https://www.youtube.com/watch?v=${videoId}` : getAlternateLink(entry);\n    return { title, link };\n  })\n  .filter((entry) => entry.title && entry.link);\n\nif (entries.length === 0) {\n  throw new Error('No YouTube videos found in feed');\n}\n\nconst selected = entries[Math.floor(Math.random() * entries.length)];\n\nreturn [\n  {\n    json: {\n      title: selected.title,\n      link: selected.link,\n      text: selected.title,\n    },\n  },\n];"
+      },
+      "id": "79920992-bf9e-42fd-802f-42f9420fa23a",
+      "name": "Choisir une video au hasard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://maker.ifttt.com/trigger/YOUR_EVENT_NAME/with/key/YOUR_IFTTT_WEBHOOK_KEY",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "value1",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "name": "value2",
+              "value": "={{ $json.link }}"
+            },
+            {
+              "name": "value3",
+              "value": "youtube"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f36c867b-cdb1-4e75-8687-0ab02660e8f6",
+      "name": "Envoyer au webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1020,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Une fois par jour": {
+      "main": [
+        [
+          {
+            "node": "Lire le flux YouTube",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire le flux YouTube": {
+      "main": [
+        [
+          {
+            "node": "Choisir une video au hasard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choisir une video au hasard": {
+      "main": [
+        [
+          {
+            "node": "Envoyer au webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
