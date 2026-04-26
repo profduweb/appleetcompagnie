@@ -1,0 +1,135 @@
+{
+  "id": "youtube-public-release-to-webhook",
+  "name": "YouTube nouvelle video publique vers webhook",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "dc40d879-7c61-4ffa-bd50-81a6ad9c61fd",
+      "name": "Toutes les 10 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.youtube.com/feeds/videos.xml?channel_id=YOUR_YOUTUBE_CHANNEL_ID",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "b91a3e45-ed27-4e9b-a8ac-af2b45168ca9",
+      "name": "Lire le flux YouTube",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "function decodeXml(value) {\n  return value\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\");\n}\n\nfunction stripCdata(value) {\n  return value.replace(/^<!\\[CDATA\\[/, '').replace(/\\]\\]>$/, '');\n}\n\nfunction getTag(entry, tagName) {\n  const match = entry.match(new RegExp(`<${tagName}[^>]*>([\\\\s\\\\S]*?)</${tagName}>`));\n  return match ? decodeXml(stripCdata(match[1].trim())) : '';\n}\n\nfunction getAlternateLink(entry) {\n  const match = entry.match(/<link\\b[^>]*rel=[\"']alternate[\"'][^>]*href=[\"']([^\"']+)[\"'][^>]*\\/?>/);\n  return match ? decodeXml(match[1]) : '';\n}\n\nconst feed = $input.first().json.data;\nconst entries = [...feed.matchAll(/<entry>([\\s\\S]*?)<\\/entry>/g)]\n  .map((match) => match[1])\n  .map((entry) => {\n    const title = getTag(entry, 'title');\n    const videoId = getTag(entry, 'yt:videoId');\n    const published = getTag(entry, 'published');\n    const updated = getTag(entry, 'updated');\n    const link = videoId ? `https://www.youtube.com/watch?v=${videoId}` : getAlternateLink(entry);\n    return { title, videoId, link, published, updated };\n  })\n  .filter((entry) => entry.title && entry.videoId && entry.link)\n  .sort((a, b) => new Date(b.published || b.updated) - new Date(a.published || a.updated));\n\nif (entries.length === 0) {\n  return [];\n}\n\nconst state = $getWorkflowStaticData('global');\nstate.seenVideoIds ||= [];\n\nconst seen = new Set(state.seenVideoIds);\nconst unseen = entries.filter((entry) => !seen.has(entry.videoId));\n\nif (!state.initialized) {\n  state.seenVideoIds = entries.slice(0, 30).map((entry) => entry.videoId);\n  state.initialized = true;\n  state.initializedAt = new Date().toISOString();\n  return [];\n}\n\nif (unseen.length === 0) {\n  return [];\n}\n\nconst selected = unseen[0];\nstate.seenVideoIds = [...new Set([selected.videoId, ...state.seenVideoIds])].slice(0, 100);\nstate.lastPublishedVideoId = selected.videoId;\nstate.lastPublishedAt = new Date().toISOString();\n\nreturn [\n  {\n    json: {\n      title: selected.title,\n      link: selected.link,\n      videoId: selected.videoId,\n      published: selected.published,\n      value1: selected.title,\n      value2: selected.link,\n      value3: 'youtube_public_release',\n    },\n  },\n];"
+      },
+      "id": "539d4d76-f0d3-4274-a11c-51623359e05e",
+      "name": "Detecter nouvelle video publique",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://maker.ifttt.com/trigger/YOUR_EVENT_NAME/with/key/YOUR_IFTTT_WEBHOOK_KEY",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "value1",
+              "value": "={{ $json.value1 }}"
+            },
+            {
+              "name": "value2",
+              "value": "={{ $json.value2 }}"
+            },
+            {
+              "name": "value3",
+              "value": "={{ $json.value3 }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3c5a2912-0d67-484e-8664-292c2772fc6d",
+      "name": "Envoyer au webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1000,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Toutes les 10 minutes": {
+      "main": [
+        [
+          {
+            "node": "Lire le flux YouTube",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire le flux YouTube": {
+      "main": [
+        [
+          {
+            "node": "Detecter nouvelle video publique",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detecter nouvelle video publique": {
+      "main": [
+        [
+          {
+            "node": "Envoyer au webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
