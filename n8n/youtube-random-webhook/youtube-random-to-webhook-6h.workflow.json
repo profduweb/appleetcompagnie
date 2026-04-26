@@ -1,6 +1,6 @@
 {
-  "id": "youtube-random-to-webhook-6h",
-  "name": "YouTube aleatoire vers webhook toutes les 6 heures",
+  "id": "youtube-random-to-webhook-daily",
+  "name": "YouTube aleatoire vers webhook une fois par jour",
   "active": false,
   "nodes": [
     {
@@ -8,14 +8,14 @@
         "rule": {
           "interval": [
             {
-              "field": "hours",
-              "hoursInterval": 6
+              "field": "days",
+              "daysInterval": 1
             }
           ]
         }
       },
       "id": "bb3b7b3c-4db8-4641-82f9-61a6b7bff7d2",
-      "name": "Toutes les 6 heures",
+      "name": "Une fois par jour",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
@@ -95,7 +95,7 @@
     }
   ],
   "connections": {
-    "Toutes les 6 heures": {
+    "Une fois par jour": {
       "main": [
         [
           {
